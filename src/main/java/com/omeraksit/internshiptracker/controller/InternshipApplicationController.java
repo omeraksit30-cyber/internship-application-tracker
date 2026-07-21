@@ -1,0 +1,83 @@
+package com.omeraksit.internshiptracker.controller;
+
+import java.net.URI;
+import java.util.List;
+
+import com.omeraksit.internshiptracker.domain.InternshipApplication;
+import com.omeraksit.internshiptracker.dto.request.CreateInternshipApplicationRequest;
+import com.omeraksit.internshiptracker.dto.request.UpdateInternshipApplicationRequest;
+import com.omeraksit.internshiptracker.dto.response.InternshipApplicationResponse;
+import com.omeraksit.internshiptracker.mapper.InternshipApplicationMapper;
+import com.omeraksit.internshiptracker.service.InternshipApplicationService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(InternshipApplicationController.BASE_PATH)
+public class InternshipApplicationController {
+
+	static final String BASE_PATH = "/api/applications";
+
+	private final InternshipApplicationService service;
+	private final InternshipApplicationMapper mapper;
+
+	public InternshipApplicationController(
+			InternshipApplicationService service,
+			InternshipApplicationMapper mapper) {
+		this.service = service;
+		this.mapper = mapper;
+	}
+
+	@PostMapping
+	public ResponseEntity<InternshipApplicationResponse> create(
+			@Valid @RequestBody CreateInternshipApplicationRequest request) {
+		InternshipApplication entity = mapper.toEntity(request);
+		InternshipApplication savedEntity = service.create(entity);
+		InternshipApplicationResponse response = mapper.toResponse(savedEntity);
+		URI location = URI.create(BASE_PATH + "/" + savedEntity.getId());
+
+		return ResponseEntity.created(location).body(response);
+	}
+
+	@GetMapping
+	public ResponseEntity<List<InternshipApplicationResponse>> getAll() {
+		List<InternshipApplication> entities = service.getAll();
+		List<InternshipApplicationResponse> responses = mapper.toResponseList(entities);
+
+		return ResponseEntity.ok(responses);
+	}
+
+	@GetMapping("/{id}")
+	public ResponseEntity<InternshipApplicationResponse> getById(@PathVariable Long id) {
+		InternshipApplication entity = service.getById(id);
+		InternshipApplicationResponse response = mapper.toResponse(entity);
+
+		return ResponseEntity.ok(response);
+	}
+
+	@PutMapping("/{id}")
+	public ResponseEntity<InternshipApplicationResponse> update(
+			@PathVariable Long id,
+			@Valid @RequestBody UpdateInternshipApplicationRequest request) {
+		InternshipApplication mappedEntity = mapper.toEntity(request);
+		InternshipApplication updatedEntity = service.update(id, mappedEntity);
+		InternshipApplicationResponse response = mapper.toResponse(updatedEntity);
+
+		return ResponseEntity.ok(response);
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id) {
+		service.delete(id);
+
+		return ResponseEntity.noContent().build();
+	}
+}
