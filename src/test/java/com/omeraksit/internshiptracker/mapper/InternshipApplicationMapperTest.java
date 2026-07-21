@@ -11,8 +11,12 @@ import com.omeraksit.internshiptracker.domain.WorkMode;
 import com.omeraksit.internshiptracker.dto.request.CreateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.request.UpdateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.response.InternshipApplicationResponse;
+import com.omeraksit.internshiptracker.dto.response.PagedResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -186,6 +190,61 @@ class InternshipApplicationMapperTest {
 		entities.add(null);
 
 		assertThrows(IllegalArgumentException.class, () -> mapper.toResponseList(entities));
+	}
+
+	@Test
+	void entityPageMapsToPagedResponse() {
+		InternshipApplication firstEntity = entity(
+				1L,
+				"Example Tech",
+				ApplicationStatus.APPLIED,
+				LocalDateTime.of(2026, 7, 1, 10, 0),
+				LocalDateTime.of(2026, 7, 1, 10, 0)
+		);
+		InternshipApplication secondEntity = entity(
+				2L,
+				"Demo Software",
+				ApplicationStatus.HR_INTERVIEW,
+				LocalDateTime.of(2026, 7, 2, 10, 0),
+				LocalDateTime.of(2026, 7, 3, 12, 0)
+		);
+		Page<InternshipApplication> entityPage = new PageImpl<>(
+				List.of(firstEntity, secondEntity),
+				PageRequest.of(1, 2),
+				5
+		);
+
+		PagedResponse<InternshipApplicationResponse> response =
+				mapper.toPagedResponse(entityPage);
+
+		assertEquals(2, response.getContent().size());
+		assertResponseFields(response.getContent().get(0), firstEntity);
+		assertResponseFields(response.getContent().get(1), secondEntity);
+		assertEquals(1, response.getPage());
+		assertEquals(2, response.getSize());
+		assertEquals(5, response.getTotalElements());
+		assertEquals(3, response.getTotalPages());
+		assertEquals(2, response.getNumberOfElements());
+		assertFalse(response.isFirst());
+		assertFalse(response.isLast());
+		assertFalse(response.isEmpty());
+	}
+
+	@Test
+	void emptyEntityPageMapsToEmptyPagedResponse() {
+		Page<InternshipApplication> entityPage = Page.empty(PageRequest.of(0, 10));
+
+		PagedResponse<InternshipApplicationResponse> response =
+				mapper.toPagedResponse(entityPage);
+
+		assertNotNull(response.getContent());
+		assertTrue(response.getContent().isEmpty());
+		assertTrue(response.isEmpty());
+	}
+
+	@Test
+	void nullPageThrowsIllegalArgumentException() {
+		assertThrows(IllegalArgumentException.class, () -> mapper.toPagedResponse(null));
 	}
 
 	private CreateInternshipApplicationRequest createRequest(ApplicationStatus status) {

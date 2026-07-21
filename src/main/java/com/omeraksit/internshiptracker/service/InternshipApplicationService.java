@@ -1,14 +1,30 @@
 package com.omeraksit.internshiptracker.service;
 
-import java.util.List;
+import java.util.Set;
 
 import com.omeraksit.internshiptracker.domain.InternshipApplication;
 import com.omeraksit.internshiptracker.exception.ApplicationNotFoundException;
 import com.omeraksit.internshiptracker.repository.InternshipApplicationRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
 public class InternshipApplicationService {
+
+	private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+			"id",
+			"companyName",
+			"positionTitle",
+			"status",
+			"workMode",
+			"applicationDate",
+			"followUpDate",
+			"createdAt",
+			"updatedAt"
+	);
 
 	private final InternshipApplicationRepository repository;
 
@@ -25,8 +41,35 @@ public class InternshipApplicationService {
 		return repository.save(application);
 	}
 
-	public List<InternshipApplication> getAll() {
-		return repository.findAll();
+	public Page<InternshipApplication> getPage(
+			int page,
+			int size,
+			String sortBy,
+			String direction) {
+		if (page < 0) {
+			throw new IllegalArgumentException("Page must be zero or greater");
+		}
+		if (size < 1) {
+			throw new IllegalArgumentException("Size must be at least 1");
+		}
+		if (size > 100) {
+			throw new IllegalArgumentException("Size must not exceed 100");
+		}
+		if (sortBy == null || !ALLOWED_SORT_FIELDS.contains(sortBy)) {
+			throw new IllegalArgumentException("Unsupported sort field: " + sortBy);
+		}
+		if (direction == null
+				|| (!direction.equalsIgnoreCase("asc") && !direction.equalsIgnoreCase("desc"))) {
+			throw new IllegalArgumentException("Direction must be either asc or desc");
+		}
+
+		Sort.Direction sortDirection = direction.equalsIgnoreCase("asc")
+				? Sort.Direction.ASC
+				: Sort.Direction.DESC;
+		Sort sort = Sort.by(sortDirection, sortBy);
+		Pageable pageable = PageRequest.of(page, size, sort);
+
+		return repository.findAll(pageable);
 	}
 
 	public InternshipApplication getById(Long id) {

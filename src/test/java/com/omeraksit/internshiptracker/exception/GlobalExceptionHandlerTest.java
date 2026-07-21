@@ -169,7 +169,8 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	void unexpectedExceptionReturns500WithoutLeakingDetails() throws Exception {
-		when(service.getAll()).thenThrow(new RuntimeException("Database password is secret"));
+		when(service.getPage(0, 10, "createdAt", "desc"))
+				.thenThrow(new RuntimeException("Database password is secret"));
 
 		mockMvc.perform(get(BASE_PATH))
 				.andExpect(status().isInternalServerError())

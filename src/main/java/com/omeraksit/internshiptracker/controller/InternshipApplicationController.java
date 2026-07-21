@@ -1,15 +1,16 @@
 package com.omeraksit.internshiptracker.controller;
 
 import java.net.URI;
-import java.util.List;
 
 import com.omeraksit.internshiptracker.domain.InternshipApplication;
 import com.omeraksit.internshiptracker.dto.request.CreateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.request.UpdateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.response.InternshipApplicationResponse;
+import com.omeraksit.internshiptracker.dto.response.PagedResponse;
 import com.omeraksit.internshiptracker.mapper.InternshipApplicationMapper;
 import com.omeraksit.internshiptracker.service.InternshipApplicationService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,11 +50,16 @@ public class InternshipApplicationController {
 	}
 
 	@GetMapping
-	public ResponseEntity<List<InternshipApplicationResponse>> getAll() {
-		List<InternshipApplication> entities = service.getAll();
-		List<InternshipApplicationResponse> responses = mapper.toResponseList(entities);
+	public ResponseEntity<PagedResponse<InternshipApplicationResponse>> getAll(
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "10") int size,
+			@RequestParam(defaultValue = "createdAt") String sortBy,
+			@RequestParam(defaultValue = "desc") String direction) {
+		Page<InternshipApplication> entityPage = service.getPage(page, size, sortBy, direction);
+		PagedResponse<InternshipApplicationResponse> response =
+				mapper.toPagedResponse(entityPage);
 
-		return ResponseEntity.ok(responses);
+		return ResponseEntity.ok(response);
 	}
 
 	@GetMapping("/{id}")

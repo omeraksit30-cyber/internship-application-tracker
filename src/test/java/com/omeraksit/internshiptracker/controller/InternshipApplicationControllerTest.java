@@ -9,6 +9,7 @@ import com.omeraksit.internshiptracker.domain.InternshipApplication;
 import com.omeraksit.internshiptracker.domain.WorkMode;
 import com.omeraksit.internshiptracker.dto.request.CreateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.request.UpdateInternshipApplicationRequest;
+import com.omeraksit.internshiptracker.exception.GlobalExceptionHandler;
 import com.omeraksit.internshiptracker.mapper.InternshipApplicationMapper;
 import com.omeraksit.internshiptracker.service.InternshipApplicationService;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InternshipApplicationController.class)
-@Import(InternshipApplicationMapper.class)
+@Import({InternshipApplicationMapper.class, GlobalExceptionHandler.class})
 class InternshipApplicationControllerTest {
 
 	private static final String BASE_PATH = "/api/applications";
@@ -98,7 +102,7 @@ class InternshipApplicationControllerTest {
 	}
 
 	@Test
-	void getAllReturnsApplications() throws Exception {
+	void getApplicationsReturnsPagedResponse() throws Exception {
 		InternshipApplication firstEntity = entity(
 				1L,
 				"Example Tech",
@@ -113,28 +117,70 @@ class InternshipApplicationControllerTest {
 				ApplicationStatus.HR_INTERVIEW,
 				WorkMode.REMOTE
 		);
-		when(service.getAll()).thenReturn(List.of(firstEntity, secondEntity));
+		Page<InternshipApplication> applicationPage = new PageImpl<>(
+				List.of(firstEntity, secondEntity),
+				PageRequest.of(0, 10),
+				2
+		);
+		when(service.getPage(0, 10, "createdAt", "desc")).thenReturn(applicationPage);
 
-		mockMvc.perform(get(BASE_PATH))
+		mockMvc.perform(get(BASE_PATH)
+					.param("page", "0")
+					.param("size", "10")
+					.param("sortBy", "createdAt")
+					.param("direction", "desc"))
 				.andExpect(status().isOk())
 				.andExpect(content().contentType(MediaType.APPLICATION_JSON))
-				.andExpect(jsonPath("$.length()").value(2))
-				.andExpect(jsonPath("$[0].companyName").value("Example Tech"))
-				.andExpect(jsonPath("$[1].companyName").value("Demo Software"));
+				.andExpect(jsonPath("$.content.length()").value(2))
+				.andExpect(jsonPath("$.content[0].companyName").value("Example Tech"))
+				.andExpect(jsonPath("$.content[1].companyName").value("Demo Software"))
+				.andExpect(jsonPath("$.page").value(0))
+				.andExpect(jsonPath("$.size").value(10))
+				.andExpect(jsonPath("$.totalElements").value(2))
+				.andExpect(jsonPath("$.totalPages").value(1))
+				.andExpect(jsonPath("$.numberOfElements").value(2))
+				.andExpect(jsonPath("$.first").value(true))
+				.andExpect(jsonPath("$.last").value(true))
+				.andExpect(jsonPath("$.empty").value(false));
 
-		verify(service).getAll();
+		verify(service).getPage(0, 10, "createdAt", "desc");
 	}
 
 	@Test
-	void getAllReturnsEmptyArray() throws Exception {
-		when(service.getAll()).thenReturn(List.of());
+	void getApplicationsUsesDefaultPaginationParameters() throws Exception {
+		when(service.getPage(0, 10, "createdAt", "desc"))
+				.thenReturn(Page.empty(PageRequest.of(0, 10)));
+
+		mockMvc.perform(get(BASE_PATH))
+				.andExpect(status().isOk());
+
+		verify(service).getPage(0, 10, "createdAt", "desc");
+	}
+
+	@Test
+	void getApplicationsReturnsEmptyPagedResponse() throws Exception {
+		when(service.getPage(0, 10, "createdAt", "desc"))
+				.thenReturn(Page.empty(PageRequest.of(0, 10)));
 
 		mockMvc.perform(get(BASE_PATH))
 				.andExpect(status().isOk())
 				.andExpect(content().contentType(MediaType.APPLICATION_JSON))
-				.andExpect(content().json("[]"));
+				.andExpect(jsonPath("$.content").isArray())
+				.andExpect(jsonPath("$.content").isEmpty())
+				.andExpect(jsonPath("$.empty").value(true));
+	}
 
-		verify(service).getAll();
+	@Test
+	void invalidPaginationReturnsStructured400() throws Exception {
+		when(service.getPage(0, 101, "createdAt", "desc"))
+				.thenThrow(new IllegalArgumentException("Size must not exceed 100"));
+
+		mockMvc.perform(get(BASE_PATH).param("size", "101"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.error").value("Bad Request"))
+				.andExpect(jsonPath("$.message").value("Size must not exceed 100"))
+				.andExpect(jsonPath("$.path").value(BASE_PATH));
 	}
 
 	@Test

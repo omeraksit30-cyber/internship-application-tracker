@@ -16,6 +16,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -61,18 +65,105 @@ class InternshipApplicationServiceTest {
 	}
 
 	@Test
-	void getAllReturnsApplications() {
+	void getPageReturnsRepositoryPage() {
 		List<InternshipApplication> applications = List.of(
 				createApplication("Example Tech", "Backend Intern"),
 				createApplication("Demo Software", "Data Engineering Intern")
 		);
-		when(repository.findAll()).thenReturn(applications);
+		Page<InternshipApplication> repositoryPage = new PageImpl<>(applications);
+		when(repository.findAll(any(Pageable.class))).thenReturn(repositoryPage);
 
-		List<InternshipApplication> result = service.getAll();
+		Page<InternshipApplication> result =
+				service.getPage(0, 10, "createdAt", "desc");
 
-		assertEquals(2, result.size());
-		assertSame(applications, result);
-		verify(repository).findAll();
+		assertSame(repositoryPage, result);
+		verify(repository).findAll(any(Pageable.class));
+	}
+
+	@Test
+	void getPageCreatesExpectedPageable() {
+		when(repository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+		service.getPage(2, 15, "companyName", "asc");
+
+		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+		verify(repository).findAll(pageableCaptor.capture());
+		Pageable pageable = pageableCaptor.getValue();
+		assertEquals(2, pageable.getPageNumber());
+		assertEquals(15, pageable.getPageSize());
+		assertEquals(
+				Sort.Direction.ASC,
+				pageable.getSort().getOrderFor("companyName").getDirection()
+		);
+	}
+
+	@Test
+	void getPageAcceptsCaseInsensitiveDirection() {
+		when(repository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+		service.getPage(0, 10, "createdAt", "DESC");
+
+		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+		verify(repository).findAll(pageableCaptor.capture());
+		assertEquals(
+				Sort.Direction.DESC,
+				pageableCaptor.getValue().getSort().getOrderFor("createdAt").getDirection()
+		);
+	}
+
+	@Test
+	void getPageRejectsNegativePage() {
+		IllegalArgumentException exception = assertThrows(
+				IllegalArgumentException.class,
+				() -> service.getPage(-1, 10, "createdAt", "desc")
+		);
+
+		assertEquals("Page must be zero or greater", exception.getMessage());
+		verify(repository, never()).findAll(any(Pageable.class));
+	}
+
+	@Test
+	void getPageRejectsZeroSize() {
+		IllegalArgumentException exception = assertThrows(
+				IllegalArgumentException.class,
+				() -> service.getPage(0, 0, "createdAt", "desc")
+		);
+
+		assertEquals("Size must be at least 1", exception.getMessage());
+		verify(repository, never()).findAll(any(Pageable.class));
+	}
+
+	@Test
+	void getPageRejectsSizeOverMaximum() {
+		IllegalArgumentException exception = assertThrows(
+				IllegalArgumentException.class,
+				() -> service.getPage(0, 101, "createdAt", "desc")
+		);
+
+		assertEquals("Size must not exceed 100", exception.getMessage());
+		verify(repository, never()).findAll(any(Pageable.class));
+	}
+
+	@Test
+	void getPageRejectsUnsupportedSortField() {
+		IllegalArgumentException exception = assertThrows(
+				IllegalArgumentException.class,
+				() -> service.getPage(0, 10, "password", "desc")
+		);
+
+		assertEquals("Unsupported sort field: password", exception.getMessage());
+		verify(repository, never()).findAll(any(Pageable.class));
+	}
+
+	@Test
+	void getPageRejectsInvalidDirection() {
+		IllegalArgumentException exception = assertThrows(
+				IllegalArgumentException.class,
+				() -> service.getPage(0, 10, "createdAt", "sideways")
+		);
+
+		assertEquals("Direction must be either asc or desc", exception.getMessage());
+		verify(repository, never()).findAll(any(Pageable.class));
 	}
 
 	@Test

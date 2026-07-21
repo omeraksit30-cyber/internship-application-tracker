@@ -8,6 +8,8 @@ import com.omeraksit.internshiptracker.domain.InternshipApplication;
 import com.omeraksit.internshiptracker.dto.request.CreateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.request.UpdateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.response.InternshipApplicationResponse;
+import com.omeraksit.internshiptracker.dto.response.PagedResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -89,5 +91,25 @@ public class InternshipApplicationMapper {
 			responses.add(toResponse(entity));
 		}
 		return responses;
+	}
+
+	public PagedResponse<InternshipApplicationResponse> toPagedResponse(
+			Page<InternshipApplication> entityPage) {
+		if (entityPage == null) {
+			throw new IllegalArgumentException("Entity page must not be null");
+		}
+
+		List<InternshipApplicationResponse> content = toResponseList(entityPage.getContent());
+		return new PagedResponse<>(
+				content,
+				entityPage.getNumber(),
+				entityPage.getSize(),
+				entityPage.getTotalElements(),
+				entityPage.getTotalPages(),
+				entityPage.getNumberOfElements(),
+				entityPage.isFirst(),
+				entityPage.isLast(),
+				entityPage.isEmpty()
+		);
 	}
 }
