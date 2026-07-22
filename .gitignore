@@ -37,3 +37,8 @@ target/
 
 # macOS files
 .DS_Store
+
+# Local environment files
+.env
+.env.*
+!.env.example

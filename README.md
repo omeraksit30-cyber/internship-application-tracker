@@ -1,76 +1,127 @@
 # Internship Application Tracker
 
-Internship Application Tracker; staj arama sürecindeki şirketleri, pozisyonları,
-iletişim kişilerini, başvuruları ve takip tarihlerini yönetmek için geliştirilecek
-bir backend REST API projesidir.
+Internship Application Tracker, staj başvurularını oluşturmak; durum, çalışma
+modeli ve şirket/pozisyon adına göre takip etmek için geliştirilen bir Spring
+Boot REST API projesidir. Proje, Java ve backend geliştirme konularını pratik
+yaparak öğrenmek amacıyla küçük ve anlaşılır aşamalarla geliştirilmektedir.
 
-## Projenin amacı
+## Features
 
-Bu proje, Java ve Spring Boot kullanarak gerçekçi bir backend uygulaması
-geliştirme pratiği yapmak amacıyla hazırlanmıştır. Proje küçük ve anlaşılır
-aşamalar hâlinde ilerletilecek; her aşamada kullanılan kavramların nedenleri
-öğrenilecektir.
+- Staj başvuruları için CRUD endpointleri
+- Jakarta Validation ile request doğrulama
+- Pagination ve güvenli sorting
+- Durum ve çalışma modeline göre filtreleme
+- Şirket ve pozisyon adında metin arama
+- Standart API hata cevapları
+- Swagger UI ve OpenAPI dokümantasyonu
+- Runtime ortamında PostgreSQL, otomatik testlerde H2
 
-## Planlanan özellikler
-
-- Şirketleri oluşturma, listeleme, güncelleme ve silme
-- Şirketlere ait staj pozisyonlarını yönetme
-- Şirketlerdeki iletişim kişilerini kaydetme
-- Staj başvurusu oluşturma ve güncelleme
-- Başvuru durumlarını takip etme
-- Takip tarihlerini görüntüleme
-- Başvuruları durum, şirket ve takip tarihine göre filtreleme
-- Gelen verileri doğrulama
-- Tutarlı API hata yanıtları üretme
-- Unit ve integration testleri yazma
-
-## Planlanan teknolojiler
+## Technologies
 
 - Java 21
-- Spring Boot
-- Maven
-- Spring Web
+- Spring Boot 4.1.0
+- Maven Wrapper
+- Spring Web MVC
 - Spring Data JPA
-- Bean Validation
+- Jakarta Validation
+- PostgreSQL
 - H2 Database
 - JUnit
-- Git
+- Docker ve Docker Compose
 
-Spring Boot'un kesin sürümü, proje kurulurken Java 21 uyumluluğu doğrulanarak
-seçilecektir.
+## Prerequisites
 
-## Planlanan veri modeli
+Projeyi yerel olarak kullanmak için aşağıdaki araçlar gereklidir:
 
-- `Company`: Başvuru yapılan şirket
-- `Position`: Şirketteki staj pozisyonu
-- `Contact`: Şirkette iletişim kurulan kişi
-- `Application`: Yapılan staj başvurusu
-- `ApplicationStatus`: Başvurunun mevcut durumu
+- Java 21
+- Docker
+- Docker Compose
 
-Veri modelinin alanları ve ilişkileri [docs/DATA_MODEL.md](docs/DATA_MODEL.md)
-dosyasında açıklanmıştır.
+Maven'i ayrıca kurmak gerekmez; repository içindeki Maven Wrapper kullanılır.
 
-## API taslağı
+## Running tests locally
 
-Planlanan endpointler, örnek istekler ve HTTP yanıtları
-[docs/API.md](docs/API.md) dosyasında yer almaktadır.
+```bash
+./mvnw test
+```
 
-## Proje durumu
+Otomatik testler bellek içinde çalışan H2 veritabanını kullanır. Testleri
+çalıştırmak için Docker, PostgreSQL veya `.env` dosyası gerekmez.
 
-Proje şu anda planlama ve dokümantasyon aşamasındadır. Henüz Spring Boot kaynak
-kodu veya Maven yapılandırması oluşturulmamıştır.
+## Running with PostgreSQL and Docker
 
-Geliştirme aşamaları [docs/ROADMAP.md](docs/ROADMAP.md) dosyasından takip
-edilecektir.
+Örnek environment dosyasını yerel `.env` dosyasına kopyalayın:
 
-## Başlangıç kapsamı
+```bash
+cp .env.example .env
+```
 
-- Uygulama ilk sürümde tek kullanıcı için çalışacaktır.
-- Kullanıcı hesabı ve kimlik doğrulama ilk sürümün kapsamında değildir.
-- API, JSON istek ve yanıtları kullanacaktır.
-- H2 veritabanı öğrenme ve yerel geliştirme amacıyla kullanılacaktır.
-- İlk sürümde her başvuru için tek bir takip tarihi tutulacaktır.
+Ardından `.env` içindeki `POSTGRES_PASSWORD` değerini yalnızca yerel
+geliştirmede kullanacağınız güçlü bir parola ile değiştirin. `.env` dosyasını
+Git'e eklemeyin.
 
-## Lisans
+PostgreSQL ve uygulama container'larını başlatın:
+
+```bash
+docker compose up --build -d
+```
+
+## Checking containers
+
+```bash
+docker compose ps
+docker compose logs -f app
+docker compose logs -f postgres
+```
+
+`logs -f` komutu canlı log akışını açar. Çıkmak için `Ctrl+C` kullanın.
+
+## Application URLs
+
+- API: http://localhost:8080/api/applications
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- OpenAPI JSON: http://localhost:8080/v3/api-docs
+
+## Stopping containers
+
+Container'ları durdurup Compose kaynaklarını kaldırmak için:
+
+```bash
+docker compose down
+```
+
+Bu komut named volume'u silmez; PostgreSQL verileri korunur.
+
+## Deleting local database data
+
+```bash
+docker compose down -v
+```
+
+Bu komut `postgres_data` named volume'unu ve içindeki bütün yerel veritabanı
+verilerini kalıcı olarak siler. Verileri korumak istiyorsanız `-v` kullanmayın.
+
+## Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `POSTGRES_DB` | PostgreSQL içinde oluşturulacak veritabanının adı |
+| `POSTGRES_USER` | PostgreSQL kullanıcı adı |
+| `POSTGRES_PASSWORD` | Yerel PostgreSQL parolası; `.env` içinde tutulur |
+| `POSTGRES_PORT` | PostgreSQL'in host bilgisayarında açılacağı port |
+| `DB_URL` | Spring Boot uygulamasının JDBC bağlantı adresi |
+| `DB_USERNAME` | Uygulamanın veritabanı kullanıcı adı |
+| `DB_PASSWORD` | Uygulamanın veritabanı parolası |
+| `JPA_DDL_AUTO` | Hibernate şema yönetim davranışı |
+
+Gerçek parolaları veya başka secret değerlerini repository'ye eklemeyin.
+
+## Documentation
+
+- [Development roadmap](docs/ROADMAP.md)
+- [API design](docs/API.md)
+- [Data model](docs/DATA_MODEL.md)
+
+## License
 
 Bu proje [MIT Lisansı](LICENSE) altında yayımlanmaktadır.
