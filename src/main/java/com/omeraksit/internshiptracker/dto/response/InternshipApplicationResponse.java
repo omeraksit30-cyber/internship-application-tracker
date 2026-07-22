@@ -5,9 +5,11 @@ import java.time.LocalDateTime;
 
 import com.omeraksit.internshiptracker.domain.ApplicationStatus;
 import com.omeraksit.internshiptracker.domain.WorkMode;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public class InternshipApplicationResponse {
 
+	@Schema(description = "Database-generated application ID", accessMode = Schema.AccessMode.READ_ONLY)
 	private Long id;
 	private String companyName;
 	private String positionTitle;
@@ -20,7 +22,10 @@ public class InternshipApplicationResponse {
 	private String contactEmail;
 	private String jobUrl;
 	private String notes;
+	@Schema(description = "Date and time when the application was created", accessMode = Schema.AccessMode.READ_ONLY)
 	private LocalDateTime createdAt;
+
+	@Schema(description = "Date and time when the application was last updated", accessMode = Schema.AccessMode.READ_ONLY)
 	private LocalDateTime updatedAt;
 
 	public InternshipApplicationResponse() {
