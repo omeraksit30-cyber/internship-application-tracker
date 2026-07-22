@@ -2,7 +2,9 @@ package com.omeraksit.internshiptracker.service;
 
 import java.util.Set;
 
+import com.omeraksit.internshiptracker.domain.ApplicationStatus;
 import com.omeraksit.internshiptracker.domain.InternshipApplication;
+import com.omeraksit.internshiptracker.domain.WorkMode;
 import com.omeraksit.internshiptracker.exception.ApplicationNotFoundException;
 import com.omeraksit.internshiptracker.repository.InternshipApplicationRepository;
 import org.springframework.data.domain.Page;
@@ -41,7 +43,10 @@ public class InternshipApplicationService {
 		return repository.save(application);
 	}
 
-	public Page<InternshipApplication> getPage(
+	public Page<InternshipApplication> searchApplications(
+			ApplicationStatus status,
+			WorkMode workMode,
+			String search,
 			int page,
 			int size,
 			String sortBy,
@@ -63,13 +68,21 @@ public class InternshipApplicationService {
 			throw new IllegalArgumentException("Direction must be either asc or desc");
 		}
 
+		String normalizedSearch = null;
+		if (search != null && !search.isBlank()) {
+			normalizedSearch = search.trim();
+			if (normalizedSearch.length() > 100) {
+				throw new IllegalArgumentException("Search term must not exceed 100 characters");
+			}
+		}
+
 		Sort.Direction sortDirection = direction.equalsIgnoreCase("asc")
 				? Sort.Direction.ASC
 				: Sort.Direction.DESC;
 		Sort sort = Sort.by(sortDirection, sortBy);
 		Pageable pageable = PageRequest.of(page, size, sort);
 
-		return repository.findAll(pageable);
+		return repository.search(status, workMode, normalizedSearch, pageable);
 	}
 
 	public InternshipApplication getById(Long id) {

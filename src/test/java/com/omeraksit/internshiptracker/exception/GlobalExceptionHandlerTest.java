@@ -169,7 +169,7 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	void unexpectedExceptionReturns500WithoutLeakingDetails() throws Exception {
-		when(service.getPage(0, 10, "createdAt", "desc"))
+		when(service.searchApplications(null, null, null, 0, 10, "createdAt", "desc"))
 				.thenThrow(new RuntimeException("Database password is secret"));
 
 		mockMvc.perform(get(BASE_PATH))
@@ -181,6 +181,32 @@ class GlobalExceptionHandlerTest {
 				.andExpect(jsonPath("$.path").value(BASE_PATH))
 				.andExpect(jsonPath("$.fieldErrors").isEmpty())
 				.andExpect(content().string(not(containsString("Database password is secret"))));
+	}
+
+	@Test
+	void invalidStatusParameterReturns400() throws Exception {
+		mockMvc.perform(get(BASE_PATH).param("status", "UNKNOWN"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentType(MediaType.APPLICATION_JSON))
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.error").value("Bad Request"))
+				.andExpect(jsonPath("$.message")
+						.value("Invalid value for parameter: status"))
+				.andExpect(jsonPath("$.path").value(BASE_PATH))
+				.andExpect(jsonPath("$.fieldErrors").isEmpty());
+	}
+
+	@Test
+	void invalidWorkModeParameterReturns400() throws Exception {
+		mockMvc.perform(get(BASE_PATH).param("workMode", "SPACE"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentType(MediaType.APPLICATION_JSON))
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.error").value("Bad Request"))
+				.andExpect(jsonPath("$.message")
+						.value("Invalid value for parameter: workMode"))
+				.andExpect(jsonPath("$.path").value(BASE_PATH))
+				.andExpect(jsonPath("$.fieldErrors").isEmpty());
 	}
 
 	private CreateInternshipApplicationRequest createRequest() {

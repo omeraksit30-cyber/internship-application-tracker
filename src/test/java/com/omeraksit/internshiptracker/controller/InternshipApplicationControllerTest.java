@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -102,7 +103,7 @@ class InternshipApplicationControllerTest {
 	}
 
 	@Test
-	void getApplicationsReturnsPagedResponse() throws Exception {
+	void getApplicationsReturnsFilteredPagedResponse() throws Exception {
 		InternshipApplication firstEntity = entity(
 				1L,
 				"Example Tech",
@@ -114,7 +115,7 @@ class InternshipApplicationControllerTest {
 				2L,
 				"Demo Software",
 				"Backend Intern",
-				ApplicationStatus.HR_INTERVIEW,
+				ApplicationStatus.APPLIED,
 				WorkMode.REMOTE
 		);
 		Page<InternshipApplication> applicationPage = new PageImpl<>(
@@ -122,9 +123,19 @@ class InternshipApplicationControllerTest {
 				PageRequest.of(0, 10),
 				2
 		);
-		when(service.getPage(0, 10, "createdAt", "desc")).thenReturn(applicationPage);
+		when(service.searchApplications(
+				ApplicationStatus.APPLIED,
+				null,
+				"software",
+				0,
+				10,
+				"createdAt",
+				"desc"
+		)).thenReturn(applicationPage);
 
 		mockMvc.perform(get(BASE_PATH)
+					.param("status", "APPLIED")
+					.param("search", "software")
 					.param("page", "0")
 					.param("size", "10")
 					.param("sortBy", "createdAt")
@@ -143,23 +154,31 @@ class InternshipApplicationControllerTest {
 				.andExpect(jsonPath("$.last").value(true))
 				.andExpect(jsonPath("$.empty").value(false));
 
-		verify(service).getPage(0, 10, "createdAt", "desc");
+		verify(service).searchApplications(
+				ApplicationStatus.APPLIED,
+				null,
+				"software",
+				0,
+				10,
+				"createdAt",
+				"desc"
+		);
 	}
 
 	@Test
-	void getApplicationsUsesDefaultPaginationParameters() throws Exception {
-		when(service.getPage(0, 10, "createdAt", "desc"))
+	void getApplicationsWithoutFiltersUsesNullFilters() throws Exception {
+		when(service.searchApplications(null, null, null, 0, 10, "createdAt", "desc"))
 				.thenReturn(Page.empty(PageRequest.of(0, 10)));
 
 		mockMvc.perform(get(BASE_PATH))
 				.andExpect(status().isOk());
 
-		verify(service).getPage(0, 10, "createdAt", "desc");
+		verify(service).searchApplications(null, null, null, 0, 10, "createdAt", "desc");
 	}
 
 	@Test
 	void getApplicationsReturnsEmptyPagedResponse() throws Exception {
-		when(service.getPage(0, 10, "createdAt", "desc"))
+		when(service.searchApplications(null, null, null, 0, 10, "createdAt", "desc"))
 				.thenReturn(Page.empty(PageRequest.of(0, 10)));
 
 		mockMvc.perform(get(BASE_PATH))
@@ -172,7 +191,7 @@ class InternshipApplicationControllerTest {
 
 	@Test
 	void invalidPaginationReturnsStructured400() throws Exception {
-		when(service.getPage(0, 101, "createdAt", "desc"))
+		when(service.searchApplications(null, null, null, 0, 101, "createdAt", "desc"))
 				.thenThrow(new IllegalArgumentException("Size must not exceed 100"));
 
 		mockMvc.perform(get(BASE_PATH).param("size", "101"))
@@ -180,6 +199,83 @@ class InternshipApplicationControllerTest {
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.error").value("Bad Request"))
 				.andExpect(jsonPath("$.message").value("Size must not exceed 100"))
+				.andExpect(jsonPath("$.path").value(BASE_PATH));
+	}
+
+	@Test
+	void getApplicationsPassesAllFiltersToService() throws Exception {
+		when(service.searchApplications(
+				ApplicationStatus.APPLIED,
+				WorkMode.REMOTE,
+				"tech",
+				1,
+				15,
+				"companyName",
+				"asc"
+		)).thenReturn(Page.empty(PageRequest.of(1, 15)));
+
+		mockMvc.perform(get(BASE_PATH)
+					.param("status", "APPLIED")
+					.param("workMode", "REMOTE")
+					.param("search", "tech")
+					.param("page", "1")
+					.param("size", "15")
+					.param("sortBy", "companyName")
+					.param("direction", "asc"))
+				.andExpect(status().isOk());
+
+		verify(service).searchApplications(
+				ApplicationStatus.APPLIED,
+				WorkMode.REMOTE,
+				"tech",
+				1,
+				15,
+				"companyName",
+				"asc"
+		);
+	}
+
+	@Test
+	void invalidStatusReturnsStructured400() throws Exception {
+		mockMvc.perform(get(BASE_PATH).param("status", "UNKNOWN"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.error").value("Bad Request"))
+				.andExpect(jsonPath("$.message")
+						.value("Invalid value for parameter: status"))
+				.andExpect(jsonPath("$.path").value(BASE_PATH));
+
+		verifyNoInteractions(service);
+	}
+
+	@Test
+	void invalidWorkModeReturnsStructured400() throws Exception {
+		mockMvc.perform(get(BASE_PATH).param("workMode", "SPACE"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.error").value("Bad Request"))
+				.andExpect(jsonPath("$.message")
+						.value("Invalid value for parameter: workMode"))
+				.andExpect(jsonPath("$.path").value(BASE_PATH));
+
+		verifyNoInteractions(service);
+	}
+
+	@Test
+	void overlyLongSearchReturnsStructured400() throws Exception {
+		String longSearch = "a".repeat(101);
+		when(service.searchApplications(
+				null, null, longSearch, 0, 10, "createdAt", "desc"
+		)).thenThrow(new IllegalArgumentException(
+				"Search term must not exceed 100 characters"
+		));
+
+		mockMvc.perform(get(BASE_PATH).param("search", longSearch))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.error").value("Bad Request"))
+				.andExpect(jsonPath("$.message")
+						.value("Search term must not exceed 100 characters"))
 				.andExpect(jsonPath("$.path").value(BASE_PATH));
 	}
 

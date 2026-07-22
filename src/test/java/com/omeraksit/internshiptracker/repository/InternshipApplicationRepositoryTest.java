@@ -5,10 +5,14 @@ import java.util.Optional;
 
 import com.omeraksit.internshiptracker.domain.ApplicationStatus;
 import com.omeraksit.internshiptracker.domain.InternshipApplication;
+import com.omeraksit.internshiptracker.domain.WorkMode;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -98,6 +102,159 @@ class InternshipApplicationRepositoryTest {
 		List<InternshipApplication> applications = repository.findAll();
 
 		assertEquals(2, applications.size());
+	}
+
+	@Test
+	void searchWithoutFiltersReturnsAllApplications() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				null, null, null, PageRequest.of(0, 10)
+		);
+
+		assertEquals(3, result.getTotalElements());
+	}
+
+	@Test
+	void searchFiltersByStatus() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				ApplicationStatus.APPLIED, null, null, PageRequest.of(0, 10)
+		);
+
+		assertEquals(2, result.getTotalElements());
+		assertTrue(result.getContent().stream()
+				.allMatch(application -> application.getStatus() == ApplicationStatus.APPLIED));
+	}
+
+	@Test
+	void searchFiltersByWorkMode() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				null, WorkMode.REMOTE, null, PageRequest.of(0, 10)
+		);
+
+		assertEquals(1, result.getTotalElements());
+		assertEquals("Example Tech", result.getContent().getFirst().getCompanyName());
+	}
+
+	@Test
+	void searchMatchesCompanyNameIgnoringCase() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				null, null, "example", PageRequest.of(0, 10)
+		);
+
+		assertEquals(1, result.getTotalElements());
+		assertEquals("Example Tech", result.getContent().getFirst().getCompanyName());
+	}
+
+	@Test
+	void searchMatchesPositionTitleIgnoringCase() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				null, null, "SOFTWARE", PageRequest.of(0, 10)
+		);
+
+		assertEquals(3, result.getTotalElements());
+		assertTrue(result.getContent().stream()
+				.anyMatch(application -> application.getPositionTitle()
+						.equals("Software Engineering Intern")));
+		assertTrue(result.getContent().stream()
+				.anyMatch(application -> application.getPositionTitle()
+						.equals("Software Developer Intern")));
+	}
+
+	@Test
+	void searchCombinesStatusAndWorkMode() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				ApplicationStatus.APPLIED,
+				WorkMode.REMOTE,
+				null,
+				PageRequest.of(0, 10)
+		);
+
+		assertEquals(1, result.getTotalElements());
+		assertEquals("Example Tech", result.getContent().getFirst().getCompanyName());
+	}
+
+	@Test
+	void searchCombinesAllFilters() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				ApplicationStatus.APPLIED,
+				WorkMode.ON_SITE,
+				"developer",
+				PageRequest.of(0, 10)
+		);
+
+		assertEquals(1, result.getTotalElements());
+		assertEquals("Sample Bank", result.getContent().getFirst().getCompanyName());
+	}
+
+	@Test
+	void searchReturnsEmptyPageWhenNoApplicationMatches() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				null, null, "no-match", PageRequest.of(0, 10)
+		);
+
+		assertTrue(result.isEmpty());
+	}
+
+	@Test
+	void searchSupportsPaginationAndSorting() {
+		saveSearchApplications();
+
+		Page<InternshipApplication> result = repository.search(
+				null,
+				null,
+				null,
+				PageRequest.of(0, 2, Sort.by(Sort.Direction.ASC, "companyName"))
+		);
+
+		assertEquals(3, result.getTotalElements());
+		assertEquals(2, result.getNumberOfElements());
+		assertEquals("Demo Software", result.getContent().get(0).getCompanyName());
+		assertEquals("Example Tech", result.getContent().get(1).getCompanyName());
+	}
+
+	private void saveSearchApplications() {
+		InternshipApplication exampleApplication = createApplication(
+				"Example Tech",
+				"Software Engineering Intern"
+		);
+		exampleApplication.setStatus(ApplicationStatus.APPLIED);
+		exampleApplication.setWorkMode(WorkMode.REMOTE);
+
+		InternshipApplication demoApplication = createApplication(
+				"Demo Software",
+				"Data Intern"
+		);
+		demoApplication.setStatus(ApplicationStatus.HR_INTERVIEW);
+		demoApplication.setWorkMode(WorkMode.HYBRID);
+
+		InternshipApplication sampleApplication = createApplication(
+				"Sample Bank",
+				"Software Developer Intern"
+		);
+		sampleApplication.setStatus(ApplicationStatus.APPLIED);
+		sampleApplication.setWorkMode(WorkMode.ON_SITE);
+
+		repository.saveAllAndFlush(List.of(
+				exampleApplication,
+				demoApplication,
+				sampleApplication
+		));
+		entityManager.clear();
 	}
 
 	private InternshipApplication createApplication(String companyName, String positionTitle) {

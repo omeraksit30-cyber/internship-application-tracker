@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -65,29 +67,48 @@ class InternshipApplicationServiceTest {
 	}
 
 	@Test
-	void getPageReturnsRepositoryPage() {
+	void searchApplicationsDelegatesFiltersToRepository() {
 		List<InternshipApplication> applications = List.of(
 				createApplication("Example Tech", "Backend Intern"),
 				createApplication("Demo Software", "Data Engineering Intern")
 		);
 		Page<InternshipApplication> repositoryPage = new PageImpl<>(applications);
-		when(repository.findAll(any(Pageable.class))).thenReturn(repositoryPage);
+		when(repository.search(
+				eq(ApplicationStatus.APPLIED),
+				eq(WorkMode.REMOTE),
+				eq("tech"),
+				any(Pageable.class)
+		)).thenReturn(repositoryPage);
 
 		Page<InternshipApplication> result =
-				service.getPage(0, 10, "createdAt", "desc");
+				service.searchApplications(
+						ApplicationStatus.APPLIED,
+						WorkMode.REMOTE,
+						"tech",
+						0,
+						10,
+						"createdAt",
+						"desc"
+				);
 
 		assertSame(repositoryPage, result);
-		verify(repository).findAll(any(Pageable.class));
+		verify(repository).search(
+				eq(ApplicationStatus.APPLIED),
+				eq(WorkMode.REMOTE),
+				eq("tech"),
+				any(Pageable.class)
+		);
 	}
 
 	@Test
-	void getPageCreatesExpectedPageable() {
-		when(repository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+	void searchApplicationsCreatesExpectedPageable() {
+		when(repository.search(isNull(), isNull(), isNull(), any(Pageable.class)))
+				.thenReturn(Page.empty());
 
-		service.getPage(2, 15, "companyName", "asc");
+		service.searchApplications(null, null, null, 2, 15, "companyName", "asc");
 
 		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-		verify(repository).findAll(pageableCaptor.capture());
+		verify(repository).search(isNull(), isNull(), isNull(), pageableCaptor.capture());
 		Pageable pageable = pageableCaptor.getValue();
 		assertEquals(2, pageable.getPageNumber());
 		assertEquals(15, pageable.getPageSize());
@@ -98,13 +119,14 @@ class InternshipApplicationServiceTest {
 	}
 
 	@Test
-	void getPageAcceptsCaseInsensitiveDirection() {
-		when(repository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+	void searchApplicationsAcceptsCaseInsensitiveDirection() {
+		when(repository.search(isNull(), isNull(), isNull(), any(Pageable.class)))
+				.thenReturn(Page.empty());
 
-		service.getPage(0, 10, "createdAt", "DESC");
+		service.searchApplications(null, null, null, 0, 10, "createdAt", "DESC");
 
 		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-		verify(repository).findAll(pageableCaptor.capture());
+		verify(repository).search(isNull(), isNull(), isNull(), pageableCaptor.capture());
 		assertEquals(
 				Sort.Direction.DESC,
 				pageableCaptor.getValue().getSort().getOrderFor("createdAt").getDirection()
@@ -112,58 +134,111 @@ class InternshipApplicationServiceTest {
 	}
 
 	@Test
-	void getPageRejectsNegativePage() {
+	void searchApplicationsRejectsNegativePage() {
 		IllegalArgumentException exception = assertThrows(
 				IllegalArgumentException.class,
-				() -> service.getPage(-1, 10, "createdAt", "desc")
+				() -> service.searchApplications(null, null, null, -1, 10, "createdAt", "desc")
 		);
 
 		assertEquals("Page must be zero or greater", exception.getMessage());
-		verify(repository, never()).findAll(any(Pageable.class));
+		verify(repository, never()).search(any(), any(), any(), any(Pageable.class));
 	}
 
 	@Test
-	void getPageRejectsZeroSize() {
+	void searchApplicationsRejectsZeroSize() {
 		IllegalArgumentException exception = assertThrows(
 				IllegalArgumentException.class,
-				() -> service.getPage(0, 0, "createdAt", "desc")
+				() -> service.searchApplications(null, null, null, 0, 0, "createdAt", "desc")
 		);
 
 		assertEquals("Size must be at least 1", exception.getMessage());
-		verify(repository, never()).findAll(any(Pageable.class));
+		verify(repository, never()).search(any(), any(), any(), any(Pageable.class));
 	}
 
 	@Test
-	void getPageRejectsSizeOverMaximum() {
+	void searchApplicationsRejectsSizeOverMaximum() {
 		IllegalArgumentException exception = assertThrows(
 				IllegalArgumentException.class,
-				() -> service.getPage(0, 101, "createdAt", "desc")
+				() -> service.searchApplications(null, null, null, 0, 101, "createdAt", "desc")
 		);
 
 		assertEquals("Size must not exceed 100", exception.getMessage());
-		verify(repository, never()).findAll(any(Pageable.class));
+		verify(repository, never()).search(any(), any(), any(), any(Pageable.class));
 	}
 
 	@Test
-	void getPageRejectsUnsupportedSortField() {
+	void searchApplicationsRejectsUnsupportedSortField() {
 		IllegalArgumentException exception = assertThrows(
 				IllegalArgumentException.class,
-				() -> service.getPage(0, 10, "password", "desc")
+				() -> service.searchApplications(null, null, null, 0, 10, "password", "desc")
 		);
 
 		assertEquals("Unsupported sort field: password", exception.getMessage());
-		verify(repository, never()).findAll(any(Pageable.class));
+		verify(repository, never()).search(any(), any(), any(), any(Pageable.class));
 	}
 
 	@Test
-	void getPageRejectsInvalidDirection() {
+	void searchApplicationsRejectsInvalidDirection() {
 		IllegalArgumentException exception = assertThrows(
 				IllegalArgumentException.class,
-				() -> service.getPage(0, 10, "createdAt", "sideways")
+				() -> service.searchApplications(
+						null, null, null, 0, 10, "createdAt", "sideways"
+				)
 		);
 
 		assertEquals("Direction must be either asc or desc", exception.getMessage());
-		verify(repository, never()).findAll(any(Pageable.class));
+		verify(repository, never()).search(any(), any(), any(), any(Pageable.class));
+	}
+
+	@Test
+	void searchApplicationsTrimsSearchTerm() {
+		when(repository.search(isNull(), isNull(), eq("software"), any(Pageable.class)))
+				.thenReturn(Page.empty());
+
+		service.searchApplications(
+				null, null, "  software  ", 0, 10, "createdAt", "desc"
+		);
+
+		verify(repository).search(isNull(), isNull(), eq("software"), any(Pageable.class));
+	}
+
+	@Test
+	void blankSearchIsConvertedToNull() {
+		when(repository.search(isNull(), isNull(), isNull(), any(Pageable.class)))
+				.thenReturn(Page.empty());
+
+		service.searchApplications(null, null, "    ", 0, 10, "createdAt", "desc");
+
+		verify(repository).search(isNull(), isNull(), isNull(), any(Pageable.class));
+	}
+
+	@Test
+	void nullSearchRemainsNull() {
+		when(repository.search(isNull(), isNull(), isNull(), any(Pageable.class)))
+				.thenReturn(Page.empty());
+
+		service.searchApplications(null, null, null, 0, 10, "createdAt", "desc");
+
+		verify(repository).search(isNull(), isNull(), isNull(), any(Pageable.class));
+	}
+
+	@Test
+	void searchTermOver100CharactersIsRejected() {
+		IllegalArgumentException exception = assertThrows(
+				IllegalArgumentException.class,
+				() -> service.searchApplications(
+						null,
+						null,
+						"a".repeat(101),
+						0,
+						10,
+						"createdAt",
+						"desc"
+				)
+		);
+
+		assertEquals("Search term must not exceed 100 characters", exception.getMessage());
+		verify(repository, never()).search(any(), any(), any(), any(Pageable.class));
 	}
 
 	@Test

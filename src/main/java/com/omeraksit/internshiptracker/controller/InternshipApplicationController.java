@@ -2,7 +2,9 @@ package com.omeraksit.internshiptracker.controller;
 
 import java.net.URI;
 
+import com.omeraksit.internshiptracker.domain.ApplicationStatus;
 import com.omeraksit.internshiptracker.domain.InternshipApplication;
+import com.omeraksit.internshiptracker.domain.WorkMode;
 import com.omeraksit.internshiptracker.dto.request.CreateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.request.UpdateInternshipApplicationRequest;
 import com.omeraksit.internshiptracker.dto.response.InternshipApplicationResponse;
@@ -51,11 +53,22 @@ public class InternshipApplicationController {
 
 	@GetMapping
 	public ResponseEntity<PagedResponse<InternshipApplicationResponse>> getAll(
+			@RequestParam(required = false) ApplicationStatus status,
+			@RequestParam(required = false) WorkMode workMode,
+			@RequestParam(required = false) String search,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "10") int size,
 			@RequestParam(defaultValue = "createdAt") String sortBy,
 			@RequestParam(defaultValue = "desc") String direction) {
-		Page<InternshipApplication> entityPage = service.getPage(page, size, sortBy, direction);
+		Page<InternshipApplication> entityPage = service.searchApplications(
+				status,
+				workMode,
+				search,
+				page,
+				size,
+				sortBy,
+				direction
+		);
 		PagedResponse<InternshipApplicationResponse> response =
 				mapper.toPagedResponse(entityPage);
 
